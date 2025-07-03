@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Sincronización - Ajedrez</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .test-section h2 {
+            color: #333;
+            border-bottom: 2px solid #009988;
+            padding-bottom: 10px;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #009988, #054cb6);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        .online {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Test de Sincronización - Ajedrez Online</h1>
+    
+    <div class="test-section">
+        <h2>📡 Estado del Servidor</h2>
+        <button class="button" onclick="testConnection()">🔍 Verificar Conexión</button>
+        <button class="button" onclick="getServerStatus()">📊 Estado del Servidor</button>
+        <div id="server-status" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎮 Simulación de Movimientos</h2>
+        <button class="button" onclick="simulateMove('peon', 'blanca', 'e2', 'e4')">♟️ Mover Peón Blanco (e2→e4)</button>
+        <button class="button" onclick="simulateMove('caballo', 'negra', 'b8', 'c6')">♞ Mover Caballo Negro (b8→c6)</button>
+        <button class="button" onclick="simulateMove('reina', 'blanca', 'd1', 'd4')">♕ Mover Reina Blanca (d1→d4)</button>
+        <div id="move-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔄 Test de Sincronización</h2>
+        <button class="button" onclick="startSyncTest()">▶️ Iniciar Test de Sincronización</button>
+        <button class="button" onclick="stopSyncTest()">⏹️ Detener Test</button>
+        <button class="button" onclick="checkLastMove()">📥 Verificar Último Movimiento</button>
+        <div>
+            <span class="status" id="sync-status">🔴 Detenido</span>
+            <span>Contador local: <strong id="local-counter">0</strong></span>
+            <span>Contador servidor: <strong id="server-counter">0</strong></span>
+        </div>
+        <div id="sync-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎯 Test de Nueva Partida</h2>
+        <button class="button" onclick="startNewGame()">🆕 Iniciar Nueva Partida</button>
+        <div id="newgame-result" class="result"></div>
+    </div>
+
+    <script>
+        let syncInterval = null;
+        let localCounter = 0;
+        let serverCounter = 0;
+
+        // Test de conexión básica
+        async function testConnection() {
+            const statusDiv = document.getElementById('server-status');
+            statusDiv.textContent = '🔄 Verificando conexión...';
+            
+            try {
+                const response = await fetch('/');
+                if (response.ok) {
+                    statusDiv.className = 'result success';
+                    statusDiv.textContent = '✅ Conexión exitosa al servidor\nEstado: ' + response.status + ' ' + response.statusText;
+                } else {
+                    throw new Error('Respuesta no exitosa');
+                }
+            } catch (error) {
+                statusDiv.className = 'result error';
+                statusDiv.textContent = '❌ Error de conexión: ' + error.message;
+            }
+        }
+
+        // Obtener estado del servidor
+        async function getServerStatus() {
+            const statusDiv = document.getElementById('server-status');
+            statusDiv.textContent = '🔄 Obteniendo estado del servidor...';
+            
+            try {
+                const response = await fetch('/estado-juego');
+                const data = await response.json();
+                
+                statusDiv.className = 'result success';
+                statusDiv.textContent = '📊 Estado del Servidor:\n' + JSON.stringify(data, null, 2);
+                
+                // Actualizar contador del servidor
+                if (data.contadorMovimientos !== undefined) {
+                    serverCounter = data.contadorMovimientos;
+                    document.getElementById('server-counter').textContent = serverCounter;
+                }
+            } catch (error) {
+                statusDiv.className = 'result error';
+                statusDiv.textContent = '❌ Error obteniendo estado: ' + error.message;
+            }
+        }
+
+        // Simular movimiento
+        async function simulateMove(pieza, color, inicial, final) {
+            const resultDiv = document.getElementById('move-result');
+            resultDiv.textContent = `🔄 Simulando movimiento: ${pieza} ${color} de ${inicial} a ${final}...`;
+            
+            try {
+                const response = await fetch('/validar-movimiento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pieza, color, inicial, final })
+                });
+                
+                const data = await response.json();
+                
+                if (data.valido) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ Movimiento válido!\n' + JSON.stringify(data, null, 2);
+                    
+                    // Actualizar contadores
+                    if (data.contadorMovimientos) {
+                        serverCounter = data.contadorMovimientos;
+                        document.getElementById('server-counter').textContent = serverCounter;
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ Movimiento inválido: ' + data.mensaje;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ Error simulando movimiento: ' + error.message;
+            }
+        }
+
+        // Verificar último movimiento
+        async function checkLastMove() {
+            const resultDiv = document.getElementById('sync-result');
+            
+            try {
+                const response = await fetch(`/ultimo-movimiento/${localCounter}`);
+                const data = await response.json();
+                
+                const timestamp = new Date().toLocaleTimeString();
+                const message = `[${timestamp}] Consulta de sincronización:\n${JSON.stringify(data, null, 2)}\n\n`;
+                
+                if (data.hayNuevoMovimiento) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = message + resultDiv.textContent;
+                    
+                    // Actualizar contadores
+                    localCounter = data.contadorMovimientos;
+                    serverCounter = data.contadorMovimientos;
+                    document.getElementById('local-counter').textContent = localCounter;
+                    document.getElementById('server-counter').textContent = serverCounter;
+                } else {
+                    resultDiv.className = 'result';
+                    resultDiv.textContent = message + resultDiv.textContent;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error verificando movimientos: ${error.message}\n\n` + resultDiv.textContent;
+            }
+        }
+
+        // Iniciar test de sincronización automática
+        function startSyncTest() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+            }
+            
+            const statusElement = document.getElementById('sync-status');
+            statusElement.textContent = '🟢 Ejecutándose';
+            statusElement.className = 'status online';
+            
+            // Verificar cada 3 segundos
+            syncInterval = setInterval(checkLastMove, 3000);
+            
+            document.getElementById('sync-result').textContent = '▶️ Test de sincronización iniciado...\n\n';
+        }
+
+        // Detener test de sincronización
+        function stopSyncTest() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+            
+            const statusElement = document.getElementById('sync-status');
+            statusElement.textContent = '🔴 Detenido';
+            statusElement.className = 'status offline';
+            
+            document.getElementById('sync-result').textContent = '⏹️ Test de sincronización detenido.\n\n' + document.getElementById('sync-result').textContent;
+        }
+
+        // Iniciar nueva partida
+        async function startNewGame() {
+            const resultDiv = document.getElementById('newgame-result');
+            resultDiv.textContent = '🔄 Iniciando nueva partida...';
+            
+            try {
+                const response = await fetch('/nueva-partida', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ Nueva partida iniciada!\n' + JSON.stringify(data, null, 2);
+                    
+                    // Resetear contadores
+                    localCounter = 0;
+                    serverCounter = 0;
+                    document.getElementById('local-counter').textContent = localCounter;
+                    document.getElementById('server-counter').textContent = serverCounter;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ Error iniciando partida: ' + data.mensaje;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ Error iniciando nueva partida: ' + error.message;
+            }
+        }
+
+        // Inicializar al cargar la página
+        window.onload = function() {
+            testConnection();
+            getServerStatus();
+        };
+    </script>
+</body>
+</html>

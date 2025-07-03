@@ -1,0 +1,93 @@
+<main>
+<section class="private-game">
+    <h1>Partidas Privadas</h1>
+    
+    {{#if pendingInvitations}}
+    <div class="games-grid">
+        <h2>📨 Invitaciones Pendientes</h2>
+        {{#each pendingInvitations}}
+        <div class="game-info invitation-pending">
+            <h3>Invitación de: {{ownerName}}</h3>
+            <div class="game-details">
+                <p><strong>Color del oponente:</strong> {{#if (eq ownerColor 'blanca')}}♔ Blancas{{else}}♚ Negras{{/if}}</p>
+                <p><strong>Tu color:</strong> {{#if (eq ownerColor 'blanca')}}♚ Negras{{else}}♔ Blancas{{/if}}</p>
+                <p><strong>Creada:</strong> {{createdDate}}</p>
+            </div>
+            <div class="button-group">
+                <a href="/join-game/{{invitationId}}" class="button success-button">✅ Aceptar</a>
+                <button onclick="declineInvitation('{{invitationId}}')" class="button danger-button">❌ Rechazar</button>
+            </div>
+        </div>
+        {{/each}}
+    </div>
+    {{/if}}
+    
+    {{#if activeGames}}
+    <div class="games-grid">
+        <h2>🎮 Partidas Activas</h2>
+        {{#each activeGames}}
+        <div class="game-info">
+            <h3>Partida contra: {{opponentName}}</h3>
+            <div class="game-details">
+                <p><strong>Estado:</strong> {{status}}</p>
+                <p><strong>Tu color:</strong> {{userColor}}</p>
+                <p><strong>Iniciada:</strong> {{startDate}}</p>
+            </div>
+            <div class="button-group">
+                <a href="/chessboard?game={{gameId}}" class="button">🎯 Continuar</a>
+            </div>
+        </div>
+        {{/each}}
+    </div>
+    {{/if}}
+    
+    {{#if error}}
+    <div class="error">{{error}}</div>
+    {{/if}}
+    
+    {{#if message}}
+    <div class="success">{{message}}</div>
+    {{/if}}
+    
+    {{#unless pendingInvitations}}
+    {{#unless activeGames}}
+    <div class="games-grid">
+        <div class="game-info">
+            <h3>🤝 No tienes partidas privadas</h3>
+            <p>Aquí aparecerán las invitaciones que recibas y las partidas privadas activas.</p>
+            <div class="button-group">
+                <a href="/creategame" class="button">➕ Crear nueva partida</a>
+                <a href="/play" class="button">🎮 Ver otros modos de juego</a>
+            </div>
+        </div>
+    </div>
+    {{/unless}}
+    {{/unless}}
+    
+</section>
+</main>
+
+<script>
+function declineInvitation(invitationId) {
+    if (confirm('¿Estás seguro de que quieres rechazar esta invitación?')) {
+        fetch(`/decline-invitation/${invitationId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error al rechazar la invitación');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al rechazar la invitación');
+        });
+    }
+}
+</script>
